@@ -129,20 +129,20 @@ void hsvtorgb(unsigned char *r, unsigned char *g, unsigned char *b, unsigned cha
 
 void ready() {
     // red
-    setColor(255, 0, 0)
-    delay(100)
-    setColor(0, 0, 0)
-    delay(200)
+    setColor(255, 0, 0);
+    delay(100);
+    setColor(0, 0, 0);
+    delay(200);
     // green
-    setColor(0, 255, 0)
-    delay(100)
-    setColor(0, 0, 0)
-    delay(200)
+    setColor(0, 255, 0);
+    delay(100);
+    setColor(0, 0, 0);
+    delay(200);
     // blue
-    setColor(0, 0, 250)
-    delay(100)
-    setColor(0, 0, 0)
-    delay(200)
+    setColor(0, 0, 250);
+    delay(100);
+    setColor(0, 0, 0);
+    delay(200);
 }
 
 void setup() {
@@ -158,7 +158,7 @@ void setup() {
     Particle.function("hue", setHue);
 
     // blink to show that it's ready for use
-    ready()
+    ready();
 }
 
 void loop() {
