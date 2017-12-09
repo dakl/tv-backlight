@@ -77,7 +77,6 @@ int setColor(int r, int g, int b)
     analogWrite(R_PIN, r);
     analogWrite(G_PIN, g);
     analogWrite(B_PIN, b);
-    Spark.publish("rgb", String(r) + ", " + String(g) + ", " + String(b));
 
     return r+g+b;
 }
