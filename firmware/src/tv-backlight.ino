@@ -6,17 +6,15 @@
  */
 
 #include "application.h"
+#include "RGBConverter.h"
 
-#define PUBLISH_TOPIC   "HKSValues"
-
-#define DELAY_LOOP      50
-
-// IMPORTANT: Set pixel COUNT, PIN and TYPE
 #define R_PIN D0
 #define G_PIN D1
 #define B_PIN D2
 
-SYSTEM_MODE(AUTOMATIC);
+#define PUBLISH_TOPIC   "HKSValues"
+
+int time_to_live = 16777215;
 
 // Brightness
 int brightness = 100;
@@ -25,50 +23,59 @@ int hue;
 // Light is on or off
 bool isOn;
 
-// Forward declarations
-int internalSetHue(int hue);
+RGBConverter converter = RGBConverter();
+
 
 // Particle Function to control light
-int ctrlLight(String args){
+int ctrlLight(String args)
+{
     int onoff = args.toInt();
-
     isOn = (1 == onoff);
-
-    internalSetHue(hue);
+    setFromHueAndBrightness(hue, 0);
 
     return onoff;
 }
 
 // Set brightness of LED
-int setBrightness(String args){
+int setBrightness(String args)
+{
     brightness = args.toInt();
+    Particle.publish("set_brightness",
+                     "brightness=" + String(brightness),
+                     time_to_live);
 
-    internalSetHue(hue);
-
-    return brightness;
+    if (setFromHueAndBrightness(hue, brightness) == 1)
+    {
+        return 1;
+    }
+    else
+    {
+        return -1;
+    }
 }
 
 // Set Hue
-int internalSetHue(int hue){
-    if(!isOn){
-        setColor(0,0,0);
-        return 0;
-    }
+int setFromHueAndBrightness(int _hue, int _brightness)
+{
+    Particle.publish(
+        "set_from_hb",
+        "_hue=" + String(_hue) + ", brightness=" + String(_brightness),
+        time_to_live);
+    double h = (double)_hue / 360.0;
+    double s = 1.0;
+    double v = (double)_brightness / 100;
 
-    float h1 = (float)hue / 360.0;
-    float h2 = h1 * 255;
+    byte rgb[] = {0, 0, 0};
 
-    int h = (int)h2;
-    int s = 255;
-    int v = (brightness * 255) / 100;
+    converter.hsvToRgb(h, s, v, rgb);
 
-    unsigned char r,g,b;
+    Particle.publish(
+        "set_from_hb",
+        "rgb=" + String(rgb[0]) + "," + String(rgb[1]) + "," + String(rgb[2]),
+        time_to_live);
+    setColor(rgb[0], rgb[1], rgb[2]);
 
-    hsvtorgb(&r, &g, &b, h, s, v);
-
-    setColor(r, g, b);
-
-    return 0;
+    return 1;
 }
 
 int setColor(int r, int g, int b)
@@ -78,56 +85,18 @@ int setColor(int r, int g, int b)
     analogWrite(G_PIN, g);
     analogWrite(B_PIN, b);
 
-    return r+g+b;
+    return 1;
 }
 
 // Set Hue
-int setHue(String args){
-    hue = args.toInt();
-
-    return internalSetHue(hue);
-}
-
-void hsvtorgb(unsigned char *r, unsigned char *g, unsigned char *b, unsigned char h, unsigned char s, unsigned char v)
+int setHue(String args)
 {
-    unsigned char region, fpart, p, q, t;
-
-    if(s == 0) {
-        /* color is grayscale */
-        *r = *g = *b = v;
-        return;
-    }
-
-    /* make hue 0-5 */
-    region = h / 43;
-    /* find remainder part, make it from 0-255 */
-    fpart = (h - (region * 43)) * 6;
-
-    /* calculate temp vars, doing integer multiplication */
-    p = (v * (255 - s)) >> 8;
-    q = (v * (255 - ((s * fpart) >> 8))) >> 8;
-    t = (v * (255 - ((s * (255 - fpart)) >> 8))) >> 8;
-
-    /* assign temp vars based on color cone region */
-    switch(region) {
-        case 0:
-            *r = v; *g = t; *b = p; break;
-        case 1:
-            *r = q; *g = v; *b = p; break;
-        case 2:
-            *r = p; *g = v; *b = t; break;
-        case 3:
-            *r = p; *g = q; *b = v; break;
-        case 4:
-            *r = t; *g = p; *b = v; break;
-        default:
-            *r = v; *g = p; *b = q; break;
-    }
-
-    return;
+    hue = args.toInt();
+    return setFromHueAndBrightness(hue, brightness);
 }
 
-void ready() {
+void ready()
+{
     // red
     setColor(255, 0, 0);
     delay(100);
@@ -145,22 +114,72 @@ void ready() {
     delay(200);
 }
 
-void setup() {
-    
+bool colorIsValidRange(int col)
+{
+    if (col > 255 || col < 0)
+    {
+        return false;
+    }
+    return true;
+}
+
+String s(int num)
+{
+    return String(num);
+}
+
+int setColorRGB(String args)
+{
+    unsigned int r, g, b;
+    sscanf(args, "%u,%u,%u", &r, &g, &b);
+
+    Particle.publish("parsed_rgb",
+                     "r=" + s(r) + ", g=" + s(g) + ", b=" + s(b),
+                     time_to_live);
+
+    if (colorIsValidRange(r) && colorIsValidRange(g) && colorIsValidRange(b))
+    {
+        double hsv[] = {0.0, 0.0, 0.0};
+        //rgb2hsv(r / 255, g / 255, b / 255, hsv);
+        converter.rgbToHsv((byte)r, (byte)g, (byte)b, hsv);
+
+        Particle.publish(
+            "parsed_hsv",
+            "h=" + String(hsv[0]) + ", v=" + String(hsv[2]),
+            time_to_live);
+
+        hue = 360 * hsv[0];
+        brightness = 100 * hsv[2];
+        setFromHueAndBrightness(hue, brightness);
+        return 1;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+void setup()
+{
+
     // setup pin modes
     pinMode(R_PIN, OUTPUT);
     pinMode(G_PIN, OUTPUT);
     pinMode(B_PIN, OUTPUT);
-    
+
     // Setup Particle Functions
     Particle.function("state", ctrlLight);
     Particle.function("brightness", setBrightness);
     Particle.function("hue", setHue);
 
+    Particle.function("color", setColorRGB);
     // blink to show that it's ready for use
+
+    Particle.variable("brightness", brightness);
+    Particle.variable("hue", hue);
     ready();
 }
 
-void loop() {
-    delay(DELAY_LOOP);
+void loop()
+{
 }
