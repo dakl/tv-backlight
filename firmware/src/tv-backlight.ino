@@ -24,6 +24,9 @@ int hue;
 int saturation = 100;
 // Light is on or off
 bool isOn;
+// is currently displaying rainbow?
+bool isRainbow = false;
+int rainbowDelay = 50;
 
 RGBConverter converter = RGBConverter();
 
@@ -31,6 +34,7 @@ RGBConverter converter = RGBConverter();
 // Particle Function to control light
 int ctrlLight(String args)
 {
+    isRainbow = false;
     int onoff = args.toInt();
     isOn = (1 == onoff);
     setFromHSB(hue, saturation, 0);
@@ -102,23 +106,26 @@ int setColor(int r, int g, int b)
 // Set Hue
 int setHue(String args)
 {
+    isRainbow = false;
     hue = args.toInt();
     return setFromHSB(hue, saturation, brightness);
 }
 
-int rainbow(int delay_millis)
+int setRainbow(String args)
 {
-    while(true)
+    rainbowDelay = args.toInt();
+    isRainbow = true;
+    return 1;
+}
+
+void setNextRainbowColor()
+{
+    hue++;
+    if (hue >= 360)
     {
-        hue++;
-        if (hue >= 360)
-        {
-            hue = 0;
-        }
-        setFromHSB(hue, saturation, brightness);
-        delay(delay_millis);
+        hue = 0;
     }
-     return 1;
+    setFromHSB(hue, saturation, brightness);
 }
 
 void ready()
@@ -156,6 +163,7 @@ String s(int num)
 
 int setColorRGB(String args)
 {
+    isRainbow = false;
     unsigned int r, g, b;
     sscanf(args, "%u,%u,%u", &r, &g, &b);
     setColor(r, g, b);
@@ -176,6 +184,7 @@ void setup()
     Particle.function("saturation", setSaturation);
     Particle.function("brightness", setBrightness);
     Particle.function("color", setColorRGB);
+    Particle.function("rainbow", setRainbow);
 
     Particle.variable("brightness", brightness);
     Particle.variable("hue", hue);
@@ -186,4 +195,9 @@ void setup()
 
 void loop()
 {
+    if (isRainbow)
+    {
+        setNextRainbowColor();
+        delay(rainbowDelay);
+    }
 }
