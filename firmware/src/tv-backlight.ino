@@ -57,10 +57,6 @@ int setBrightness(String args)
 // Set Hue
 int setFromHueAndBrightness(int _hue, int _brightness)
 {
-    Particle.publish(
-        "set_from_hb",
-        "_hue=" + String(_hue) + ", brightness=" + String(_brightness),
-        time_to_live);
     double h = (double)_hue / 360.0;
     double s = 1.0;
     double v = (double)_brightness / 100;
@@ -69,10 +65,6 @@ int setFromHueAndBrightness(int _hue, int _brightness)
 
     converter.hsvToRgb(h, s, v, rgb);
 
-    Particle.publish(
-        "set_from_hb",
-        "rgb=" + String(rgb[0]) + "," + String(rgb[1]) + "," + String(rgb[2]),
-        time_to_live);
     setColor(rgb[0], rgb[1], rgb[2]);
 
     return 1;
