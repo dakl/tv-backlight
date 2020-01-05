@@ -20,6 +20,8 @@ int time_to_live = 16777215;
 int brightness = 100;
 // Current Hue
 int hue;
+// Curren saturation
+int saturation = 100;
 // Light is on or off
 bool isOn;
 
@@ -31,7 +33,7 @@ int ctrlLight(String args)
 {
     int onoff = args.toInt();
     isOn = (1 == onoff);
-    setFromHueAndBrightness(hue, 0);
+    setFromHSB(hue, saturation, 0);
 
     return onoff;
 }
@@ -44,7 +46,7 @@ int setBrightness(String args)
                      "brightness=" + String(brightness),
                      time_to_live);
 
-    if (setFromHueAndBrightness(hue, brightness) == 1)
+    if (setFromHSB(hue, saturation, brightness) == 1)
     {
         return 1;
     }
@@ -54,11 +56,25 @@ int setBrightness(String args)
     }
 }
 
+int setSaturation(String args)
+{
+    saturation = args.toInt();
+    if (setFromHSB(hue, saturation, brightness) == 1)
+    {
+        return 1;
+    }
+    else
+    {
+        return -1;
+    }
+
+}
+
 // Set Hue
-int setFromHueAndBrightness(int _hue, int _brightness)
+int setFromHSB(int _hue, int _saturation, int _brightness)
 {
     double h = (double)_hue / 360.0;
-    double s = 1.0;
+    double s = (double)_saturation / 100.0;
     double v = (double)_brightness / 100;
 
     byte rgb[] = {0, 0, 0};
@@ -66,6 +82,9 @@ int setFromHueAndBrightness(int _hue, int _brightness)
     converter.hsvToRgb(h, s, v, rgb);
 
     setColor(rgb[0], rgb[1], rgb[2]);
+    hue = _hue;
+    saturation = _saturation;
+    brightness = _brightness;
 
     return 1;
 }
@@ -84,7 +103,22 @@ int setColor(int r, int g, int b)
 int setHue(String args)
 {
     hue = args.toInt();
-    return setFromHueAndBrightness(hue, brightness);
+    return setFromHSB(hue, saturation, brightness);
+}
+
+int rainbow(int delay_millis)
+{
+    while(true)
+    {
+        hue++;
+        if (hue >= 360)
+        {
+            hue = 0;
+        }
+        setFromHSB(hue, saturation, brightness);
+        delay(delay_millis);
+    }
+     return 1;
 }
 
 void ready()
@@ -124,31 +158,8 @@ int setColorRGB(String args)
 {
     unsigned int r, g, b;
     sscanf(args, "%u,%u,%u", &r, &g, &b);
-
-    Particle.publish("parsed_rgb",
-                     "r=" + s(r) + ", g=" + s(g) + ", b=" + s(b),
-                     time_to_live);
-
-    if (colorIsValidRange(r) && colorIsValidRange(g) && colorIsValidRange(b))
-    {
-        double hsv[] = {0.0, 0.0, 0.0};
-        //rgb2hsv(r / 255, g / 255, b / 255, hsv);
-        converter.rgbToHsv((byte)r, (byte)g, (byte)b, hsv);
-
-        Particle.publish(
-            "parsed_hsv",
-            "h=" + String(hsv[0]) + ", v=" + String(hsv[2]),
-            time_to_live);
-
-        hue = 360 * hsv[0];
-        brightness = 100 * hsv[2];
-        setFromHueAndBrightness(hue, brightness);
-        return 1;
-    }
-    else
-    {
-        return -1;
-    }
+    setColor(r, g, b);
+    return 1;
 }
 
 void setup()
@@ -161,14 +172,15 @@ void setup()
 
     // Setup Particle Functions
     Particle.function("state", ctrlLight);
-    Particle.function("brightness", setBrightness);
     Particle.function("hue", setHue);
-
+    Particle.function("saturation", setSaturation);
+    Particle.function("brightness", setBrightness);
     Particle.function("color", setColorRGB);
-    // blink to show that it's ready for use
 
     Particle.variable("brightness", brightness);
     Particle.variable("hue", hue);
+
+    // blink to show that it's ready for use
     ready();
 }
 
