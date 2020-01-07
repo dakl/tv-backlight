@@ -1,4 +1,4 @@
-/*
+ /*
  * Project tv-backlight
  * Description: Control my TV-backlight over http
  * Author: Daniel Klevebring
@@ -16,64 +16,36 @@
 
 int time_to_live = 16777215;
 
-// Brightness
+// HSB state
+int hue = 43;
+int saturation = 100;
 int brightness = 100;
-// Current Hue
-int hue;
+
 // Light is on or off
 bool isOn;
+
+// is currently displaying rainbow?
+bool isRainbow = false;
+int rainbowDelay = 50;
 
 RGBConverter converter = RGBConverter();
 
 
-// Particle Function to control light
-int ctrlLight(String args)
-{
-    int onoff = args.toInt();
-    isOn = (1 == onoff);
-    setFromHueAndBrightness(hue, 0);
-
-    return onoff;
-}
-
-// Set brightness of LED
-int setBrightness(String args)
-{
-    brightness = args.toInt();
-    Particle.publish("set_brightness",
-                     "brightness=" + String(brightness),
-                     time_to_live);
-
-    if (setFromHueAndBrightness(hue, brightness) == 1)
-    {
-        return 1;
-    }
-    else
-    {
-        return -1;
-    }
-}
-
 // Set Hue
-int setFromHueAndBrightness(int _hue, int _brightness)
+int setFromHSB(int _hue, int _saturation, int _brightness)
 {
-    Particle.publish(
-        "set_from_hb",
-        "_hue=" + String(_hue) + ", brightness=" + String(_brightness),
-        time_to_live);
     double h = (double)_hue / 360.0;
-    double s = 1.0;
-    double v = (double)_brightness / 100;
+    double s = (double)_saturation / 100.0;
+    double v = (double)_brightness / 100.0;
 
     byte rgb[] = {0, 0, 0};
 
     converter.hsvToRgb(h, s, v, rgb);
 
-    Particle.publish(
-        "set_from_hb",
-        "rgb=" + String(rgb[0]) + "," + String(rgb[1]) + "," + String(rgb[2]),
-        time_to_live);
     setColor(rgb[0], rgb[1], rgb[2]);
+    hue = _hue;
+    saturation = _saturation;
+    brightness = _brightness;
 
     return 1;
 }
@@ -88,11 +60,108 @@ int setColor(int r, int g, int b)
     return 1;
 }
 
-// Set Hue
-int setHue(String args)
+void setNextRainbowColor()
 {
+    hue++;
+    if (hue >= 360)
+    {
+        hue = 0;
+    }
+    setFromHSB(hue, saturation, brightness);
+}
+
+bool colorIsValidRange(int col)
+{
+    if (col > 255 || col < 0)
+    {
+        return false;
+    }
+    return true;
+}
+
+String s(int num)
+{
+    return String(num);
+}
+
+
+/**************************************************************
+                          Callbacks
+**************************************************************/
+
+// Particle Function to control light
+int setStateCallback(String args)
+{
+    isRainbow = false;
+    int onoff = args.toInt();
+    isOn = (1 == onoff);
+    if (isOn)
+    {
+        hue = 43;
+        saturation = 100;
+        brightness = 100;
+    }
+    else
+    {
+        brightness = 0;
+    }
+    setFromHSB(hue, saturation, brightness);
+
+    return onoff;
+}
+
+int setHueCallback(String args)
+{
+    isRainbow = false;
     hue = args.toInt();
-    return setFromHueAndBrightness(hue, brightness);
+    return setFromHSB(hue, saturation, brightness);
+}
+
+int setSaturationCallback(String args)
+{
+    saturation = 100; //args.toInt();
+    if (setFromHSB(hue, saturation, brightness) == 1)
+    {
+        return 1;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+// Set brightness of LED
+int setBrightnessCallback(String args)
+{
+    brightness = args.toInt();
+    Particle.publish("set_brightness",
+                     "brightness=" + String(brightness),
+                     time_to_live);
+
+    if (setFromHSB(hue, saturation, brightness) == 1)
+    {
+        return 1;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+int setRainbowCallback(String args)
+{
+    rainbowDelay = args.toInt();
+    isRainbow = true;
+    return 1;
+}
+
+int setColorRGBCallback(String args)
+{
+    isRainbow = false;
+    unsigned int r, g, b;
+    sscanf(args, "%u,%u,%u", &r, &g, &b);
+    setColor(r, g, b);
+    return 1;
 }
 
 void ready()
@@ -114,51 +183,6 @@ void ready()
     delay(200);
 }
 
-bool colorIsValidRange(int col)
-{
-    if (col > 255 || col < 0)
-    {
-        return false;
-    }
-    return true;
-}
-
-String s(int num)
-{
-    return String(num);
-}
-
-int setColorRGB(String args)
-{
-    unsigned int r, g, b;
-    sscanf(args, "%u,%u,%u", &r, &g, &b);
-
-    Particle.publish("parsed_rgb",
-                     "r=" + s(r) + ", g=" + s(g) + ", b=" + s(b),
-                     time_to_live);
-
-    if (colorIsValidRange(r) && colorIsValidRange(g) && colorIsValidRange(b))
-    {
-        double hsv[] = {0.0, 0.0, 0.0};
-        //rgb2hsv(r / 255, g / 255, b / 255, hsv);
-        converter.rgbToHsv((byte)r, (byte)g, (byte)b, hsv);
-
-        Particle.publish(
-            "parsed_hsv",
-            "h=" + String(hsv[0]) + ", v=" + String(hsv[2]),
-            time_to_live);
-
-        hue = 360 * hsv[0];
-        brightness = 100 * hsv[2];
-        setFromHueAndBrightness(hue, brightness);
-        return 1;
-    }
-    else
-    {
-        return -1;
-    }
-}
-
 void setup()
 {
 
@@ -168,18 +192,26 @@ void setup()
     pinMode(B_PIN, OUTPUT);
 
     // Setup Particle Functions
-    Particle.function("state", ctrlLight);
-    Particle.function("brightness", setBrightness);
-    Particle.function("hue", setHue);
+    Particle.function("state", setStateCallback);
+    Particle.function("hue", setHueCallback);
+    Particle.function("saturation", setSaturationCallback);
+    Particle.function("brightness", setBrightnessCallback);
+    Particle.function("color", setColorRGBCallback);
+    Particle.function("rainbow", setRainbowCallback);
 
-    Particle.function("color", setColorRGB);
-    // blink to show that it's ready for use
-
+    // Set up partivle variables
     Particle.variable("brightness", brightness);
     Particle.variable("hue", hue);
+
+    // blink to show that it's ready for use
     ready();
 }
 
 void loop()
 {
+    if (isRainbow)
+    {
+        setNextRainbowColor();
+        delay(rainbowDelay);
+    }
 }

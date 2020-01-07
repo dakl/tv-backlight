@@ -10,4 +10,4 @@ script:
   - particle compile photon firmware --saveTo photon_firmware.bin
 
 after_success:
-  - particle flash $DEVICE_ID photon_firmware.bin
+  - test $TRAVIS_BRANCH = "master" && particle flash $DEVICE_ID photon_firmware.bin
