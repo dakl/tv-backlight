@@ -16,14 +16,14 @@
 
 int time_to_live = 16777215;
 
-// Brightness
-int brightness = 100;
-// Current Hue
-int hue;
-// Curren saturation
+// HSB state
+int hue = 43;
 int saturation = 100;
+int brightness = 100;
+
 // Light is on or off
 bool isOn;
+
 // is currently displaying rainbow?
 bool isRainbow = false;
 int rainbowDelay = 50;
@@ -97,7 +97,7 @@ int setStateCallback(String args)
     isOn = (1 == onoff);
     if (isOn)
     {
-        hue = 35;
+        hue = 43;
         saturation = 100;
         brightness = 100;
     }
@@ -111,8 +111,8 @@ int setStateCallback(String args)
 }
 
 int setHueCallback(String args)
-{Callback
-    isRCallbackainbow = false;
+{
+    isRainbow = false;
     hue = args.toInt();
     return setFromHSB(hue, saturation, brightness);
 }
